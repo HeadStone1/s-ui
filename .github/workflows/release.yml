@@ -1,6 +1,9 @@
 name: 发布 S-UI
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -176,7 +179,7 @@ jobs:
       - name: 规范化发布标签
         id: vars
         run: |
-          TAG="${{ inputs.tag }}"
+          TAG="${{ inputs.tag || github.ref_name }}"
           case "$TAG" in
             v*) echo "tag=$TAG" >> "$GITHUB_OUTPUT" ;;
             *) echo "tag=v$TAG" >> "$GITHUB_OUTPUT" ;;
