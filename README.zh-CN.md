@@ -1,8 +1,8 @@
 # HeadStone1/s-ui 安全加固版
 
 <p align="center">
-  <a href="./README-FORK.md">English EN</a> /
-  <a href="./README-FORK.zh-CN.md">简体中文 CN</a>
+  <a href="./README.md">English EN</a> /
+  <a href="./README.zh-CN.md">简体中文 CN</a>
 </p>
 
 `HeadStone1/s-ui` 是基于 S-UI 继续维护的安全加固版本，保留原有 Sing-Box Web 面板能力，重点改进默认部署安全性和公网使用风险。
