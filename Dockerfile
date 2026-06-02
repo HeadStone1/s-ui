@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM node:alpine AS front-builder
 WORKDIR /app
 COPY frontend/ ./
-RUN npm install && npm run build
+RUN npm ci && npm run build
 
 FROM golang:1.25-alpine AS backend-builder
 WORKDIR /app
@@ -44,5 +44,10 @@ WORKDIR /app
 RUN set -ex && apk add --no-cache --upgrade bash tzdata ca-certificates nftables
 COPY --from=backend-builder /app/sui /app/libcronet.so /app/
 COPY entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
+RUN addgroup -S sui && adduser -S -G sui sui \
+    && mkdir -p /app/db /app/cert \
+    && chown -R sui:sui /app \
+    && chmod +x /app/entrypoint.sh
+USER sui
+EXPOSE 2095 2096
 ENTRYPOINT [ "./entrypoint.sh" ]

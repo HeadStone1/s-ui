@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/admin8800/s-ui/logger"
+	"github.com/HeadStone1/s-ui/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,15 +17,12 @@ type Msg struct {
 }
 
 func getRemoteIp(c *gin.Context) string {
-	value := c.GetHeader("X-Forwarded-For")
-	if value != "" {
-		ips := strings.Split(value, ",")
-		return ips[0]
-	} else {
-		addr := c.Request.RemoteAddr
-		ip, _, _ := net.SplitHostPort(addr)
-		return ip
+	addr := c.Request.RemoteAddr
+	ip, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
 	}
+	return ip
 }
 
 func getHostname(c *gin.Context) string {

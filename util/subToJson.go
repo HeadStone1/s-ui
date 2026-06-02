@@ -1,31 +1,61 @@
 package util
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/util/common"
 )
 
 func GetExternalLink(url string) string {
+	if err := validateExternalURL(url); err != nil {
+		logger.Warning("sub: blocked external URL:", err)
+		return ""
+	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateExternalHost(host); err != nil {
+				return nil, err
+			}
+			dialer := &net.Dialer{Timeout: 5 * time.Second}
+			return dialer.DialContext(ctx, network, addr)
+		},
 	}
 
-	client := &http.Client{Transport: tr}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return validateExternalURL(req.URL.String())
+		},
+	}
 
-	response, err := client.Get(url)
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		logger.Warning("sub: Error creating HTTP request:", err)
+		return ""
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		logger.Warning("sub: Error making HTTP request:", err)
 		return ""
 	}
 	defer response.Body.Close()
 
-	body, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(io.LimitReader(response.Body, 5<<20))
 	if err != nil {
 		logger.Warning("sub: Error reading response body:", err)
 		return ""
@@ -33,6 +63,48 @@ func GetExternalLink(url string) string {
 
 	data := StrOrBase64Encoded(string(body))
 	return data
+}
+
+func validateExternalURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return err
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return common.NewError("unsupported URL scheme")
+	}
+	return validateExternalHost(parsed.Hostname())
+}
+
+func validateExternalHost(host string) error {
+	if host == "" {
+		return common.NewError("missing host")
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		if isBlockedExternalIP(ip) {
+			return common.NewError("blocked private or local address")
+		}
+		return nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return err
+	}
+	for _, resolvedIP := range ips {
+		if isBlockedExternalIP(resolvedIP) {
+			return common.NewError("blocked private or local address")
+		}
+	}
+	return nil
+}
+
+func isBlockedExternalIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified()
 }
 
 func GetExternalSub(url string) ([]map[string]interface{}, error) {

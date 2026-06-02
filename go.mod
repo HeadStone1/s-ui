@@ -1,4 +1,4 @@
-module github.com/admin8800/s-ui
+module github.com/HeadStone1/s-ui
 
 go 1.25.7
 

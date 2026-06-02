@@ -1,8 +1,9 @@
 package sub
 
 import (
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/service"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,22 +21,37 @@ func NewSubHandler(g *gin.RouterGroup) {
 }
 
 func (s *SubHandler) initRouter(g *gin.RouterGroup) {
+	g.GET("/:clientId/:secret", s.subsWithSecret)
+	g.HEAD("/:clientId/:secret", s.subHeadersWithSecret)
 	g.GET("/:subid", s.subs)
 	g.HEAD("/:subid", s.subHeaders)
 }
 
 func (s *SubHandler) subs(c *gin.Context) {
+	c.String(404, "subscription secret required")
+}
+
+func (s *SubHandler) subsWithSecret(c *gin.Context) {
+	client, err := s.SubService.getClientBySecret(c.Param("clientId"), c.Param("secret"))
+	if err != nil {
+		logger.Error(err)
+		c.String(400, "Error!")
+		return
+	}
+	s.writeSubResponse(c, client)
+}
+
+func (s *SubHandler) writeSubResponse(c *gin.Context, client *model.Client) {
 	var headers []string
 	var result *string
 	var err error
-	subId := c.Param("subid")
 	format, isFormat := c.GetQuery("format")
 	if isFormat {
 		switch format {
 		case "json":
-			result, headers, err = s.JsonService.GetJson(subId, format)
+			result, headers, err = s.JsonService.GetJsonForClient(client, format)
 		case "clash":
-			result, headers, err = s.ClashService.GetClash(subId)
+			result, headers, err = s.ClashService.GetClashForClient(client)
 		}
 		if err != nil || result == nil {
 			logger.Error(err)
@@ -43,22 +59,23 @@ func (s *SubHandler) subs(c *gin.Context) {
 			return
 		}
 	} else {
-		result, headers, err = s.SubService.GetSubs(subId)
+		result, headers, err = s.SubService.GetSubsForClient(client)
 		if err != nil || result == nil {
 			logger.Error(err)
 			c.String(400, "Error!")
 			return
 		}
 	}
-
 	s.addHeaders(c, headers)
-
 	c.String(200, *result)
 }
 
 func (s *SubHandler) subHeaders(c *gin.Context) {
-	subId := c.Param("subid")
-	client, err := s.SubService.getClientBySubId(subId)
+	c.String(404, "subscription secret required")
+}
+
+func (s *SubHandler) subHeadersWithSecret(c *gin.Context) {
+	client, err := s.SubService.getClientBySecret(c.Param("clientId"), c.Param("secret"))
 	if err != nil {
 		logger.Error(err)
 		c.String(400, "Error!")

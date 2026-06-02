@@ -25,7 +25,7 @@ if errorlevel 1 (
 
 echo Building frontend...
 cd frontend
-call npm install
+call npm ci
 if errorlevel 1 (
     echo Error: Failed to install frontend dependencies
     pause

@@ -3,9 +3,10 @@ package sub
 import (
 	"strings"
 
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/service"
-	"github.com/admin8800/s-ui/util"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/util"
 
 	"gopkg.in/yaml.v3"
 )
@@ -62,8 +63,16 @@ const ProxyGroups = `- name: Proxy
 `
 
 func (s *ClashService) GetClash(subId string) (*string, []string, error) {
+	subService := SubService{}
+	client, err := subService.getClientBySubId(subId)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.GetClashForClient(client)
+}
 
-	client, inDatas, err := s.getData(subId)
+func (s *ClashService) GetClashForClient(client *model.Client) (*string, []string, error) {
+	inDatas, err := s.getData(client)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/util"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/util"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"gorm.io/gorm"
 )
@@ -58,6 +58,10 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 		if err != nil {
 			return nil, err
 		}
+		err = s.ensureSubSecret(tx, &client)
+		if err != nil {
+			return nil, err
+		}
 		err = s.updateLinksWithFixedInbounds(tx, []*model.Client{&client}, hostname)
 		if err != nil {
 			return nil, err
@@ -84,6 +88,12 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 		if err != nil {
 			return nil, err
 		}
+		for _, client := range clients {
+			err = s.ensureSubSecret(tx, client)
+			if err != nil {
+				return nil, err
+			}
+		}
 		err = json.Unmarshal(clients[0].Inbounds, &inboundIds)
 		if err != nil {
 			return nil, err
@@ -103,6 +113,10 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 			return nil, err
 		}
 		for _, client := range clients {
+			err = s.ensureSubSecret(tx, client)
+			if err != nil {
+				return nil, err
+			}
 			changedInboundIds, err := s.findInboundsChanges(tx, client, true)
 			if err != nil {
 				return nil, err
@@ -168,6 +182,25 @@ func (s *ClientService) Save(tx *gorm.DB, act string, data json.RawMessage, host
 	}
 
 	return inboundIds, nil
+}
+
+func (s *ClientService) ensureSubSecret(tx *gorm.DB, client *model.Client) error {
+	if client.SubSecret != "" {
+		return nil
+	}
+	if client.Id > 0 {
+		var oldClient model.Client
+		err := tx.Model(model.Client{}).Select("sub_secret").Where("id = ?", client.Id).First(&oldClient).Error
+		if err != nil && !database.IsNotFound(err) {
+			return err
+		}
+		if oldClient.SubSecret != "" {
+			client.SubSecret = oldClient.SubSecret
+			return nil
+		}
+	}
+	client.SubSecret = common.Random(32)
+	return nil
 }
 
 func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*model.Client, hostname string) error {

@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/admin8800/s-ui/cmd/migration"
-	"github.com/admin8800/s-ui/config"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/cmd/migration"
+	"github.com/HeadStone1/s-ui/config"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -259,6 +259,10 @@ func ImportDB(file multipart.File) error {
 		}
 		return common.NewErrorf("Error migrating db: %v", err)
 	}
+	err = rotateSecretsAfterImport()
+	if err != nil {
+		return err
+	}
 
 	// Restart app
 	err = SendSighup()
@@ -266,6 +270,25 @@ func ImportDB(file multipart.File) error {
 		return common.NewErrorf("Error restarting app: %v", err)
 	}
 
+	return nil
+}
+
+func rotateSecretsAfterImport() error {
+	err := db.Where("id > 0").Delete(&model.Tokens{}).Error
+	if err != nil {
+		return common.NewErrorf("Error deleting API tokens after import: %v", err)
+	}
+	secret := common.Random(32)
+	result := db.Model(&model.Setting{}).Where("key = ?", "secret").Update("value", secret)
+	if result.Error != nil {
+		return common.NewErrorf("Error rotating session secret after import: %v", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		err = db.Create(&model.Setting{Key: "secret", Value: secret}).Error
+		if err != nil {
+			return common.NewErrorf("Error creating session secret after import: %v", err)
+		}
+	}
 	return nil
 }
 

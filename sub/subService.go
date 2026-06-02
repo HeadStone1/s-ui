@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/service"
-	"github.com/admin8800/s-ui/util"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/util"
 )
 
 type SubService struct {
@@ -24,7 +24,10 @@ func (s *SubService) GetSubs(subId string) (*string, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return s.GetSubsForClient(client)
+}
 
+func (s *SubService) GetSubsForClient(client *model.Client) (*string, []string, error) {
 	clientInfo := ""
 	subShowInfo, _ := s.SettingService.GetSubShowInfo()
 	if subShowInfo {
@@ -42,6 +45,16 @@ func (s *SubService) GetSubs(subId string) (*string, []string, error) {
 	}
 
 	return &result, headers, nil
+}
+
+func (j *SubService) getClientBySecret(clientId string, secret string) (*model.Client, error) {
+	db := database.GetDB()
+	client := &model.Client{}
+	err := db.Model(model.Client{}).Where("enable = true and id = ? and sub_secret = ?", clientId, secret).First(client).Error
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func (j *SubService) getClientBySubId(subId string) (*model.Client, error) {

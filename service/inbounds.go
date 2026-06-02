@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/util"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/util"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"gorm.io/gorm"
 )

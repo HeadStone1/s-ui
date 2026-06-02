@@ -2,13 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/service"
-	"github.com/admin8800/s-ui/util"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/util"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -239,7 +242,14 @@ func (a *ApiService) GetKeypairs(c *gin.Context) {
 }
 
 func (a *ApiService) GetDb(c *gin.Context) {
+	if IsLogin(c) && !a.confirmCurrentPassword(c) {
+		jsonMsg(c, "", common.NewError("current password confirmation required"))
+		return
+	}
 	exclude := c.Query("exclude")
+	if exclude == "" {
+		exclude = c.Request.FormValue("exclude")
+	}
 	db, err := database.GetDb(exclude)
 	if err != nil {
 		jsonMsg(c, "", err)
@@ -274,6 +284,10 @@ func (a *ApiService) Login(c *gin.Context) {
 
 	err = SetLoginUser(c, loginUser, sessionMaxAge)
 	if err == nil {
+		if csrfErr := SetCSRFHeader(c); csrfErr != nil {
+			jsonMsg(c, "", csrfErr)
+			return
+		}
 		logger.Info("user ", loginUser, " login success")
 	} else {
 		logger.Warning("login failed: ", err)
@@ -337,14 +351,47 @@ func (a *ApiService) SubConvert(c *gin.Context) {
 }
 
 func (a *ApiService) ImportDb(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 128<<20)
+	if IsLogin(c) && !a.confirmCurrentPassword(c) {
+		jsonMsg(c, "", common.NewError("current password confirmation required"))
+		return
+	}
 	file, _, err := c.Request.FormFile("db")
 	if err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
 	defer file.Close()
+	header := make([]byte, 16)
+	if _, err := io.ReadFull(file, header); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	if string(header) != "SQLite format 3\x00" {
+		jsonMsg(c, "", common.NewError("invalid SQLite database file"))
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
 	err = database.ImportDB(file)
+	if err == nil && IsLogin(c) {
+		ClearSession(c)
+	}
 	jsonMsg(c, "", err)
+}
+
+func (a *ApiService) confirmCurrentPassword(c *gin.Context) bool {
+	loginUser := GetLoginUser(c)
+	if loginUser == "" {
+		return false
+	}
+	password := c.GetHeader("X-Confirm-Password")
+	if password == "" {
+		password = c.Request.FormValue("confirmPass")
+	}
+	return a.UserService.CheckPassword(loginUser, password)
 }
 
 func (a *ApiService) Logout(c *gin.Context) {
@@ -375,7 +422,8 @@ func (a *ApiService) AddToken(c *gin.Context) {
 		return
 	}
 	desc := c.Request.FormValue("desc")
-	token, err := a.UserService.AddToken(loginUser, expiryInt, desc)
+	scope := c.Request.FormValue("scope")
+	token, err := a.UserService.AddToken(loginUser, expiryInt, desc, scope)
 	jsonObj(c, token, err)
 }
 

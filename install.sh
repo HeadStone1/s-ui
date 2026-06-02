@@ -131,17 +131,37 @@ prepare_services() {
     systemctl daemon-reload
 }
 
+verify_archive() {
+    local version="$1"
+    local archive="s-ui-linux-$(arch).tar.gz"
+    local checksums="/tmp/s-ui-sha256sums.txt"
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        echo -e "${red}sha256sum is required to verify release archives${plain}"
+        exit 1
+    fi
+    wget -q --no-check-certificate -O "${checksums}" "https://github.com/HeadStone1/s-ui/releases/download/${version}/sha256sums.txt"
+    if [[ $? -ne 0 ]]; then
+        echo -e "${red}failed to download sha256sums.txt${plain}"
+        exit 1
+    fi
+    grep " ${archive}$" "${checksums}" | sha256sum -c -
+    if [[ $? -ne 0 ]]; then
+        echo -e "${red}release archive checksum verification failed${plain}"
+        exit 1
+    fi
+}
+
 install_s-ui() {
     cd /tmp/
 
     if [ $# == 0 ]; then
-        last_version=$(curl -Ls "https://api.github.com/repos/admin8800/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        last_version=$(curl -Ls "https://api.github.com/repos/HeadStone1/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$last_version" ]]; then
             echo -e "${red}获取 s-ui 版本失败，可能是 Github API 限制导致，请稍后重试${plain}"
             exit 1
         fi
         echo -e "已获取 s-ui 最新版本：${last_version}，开始安装..."
-        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz https://github.com/admin8800/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz
+        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz https://github.com/HeadStone1/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz
         if [[ $? -ne 0 ]]; then
             echo -e "${red}下载 s-ui 失败，请确认服务器可以访问 Github ${plain}"
             exit 1
@@ -149,7 +169,7 @@ install_s-ui() {
     else
         last_version=$1
         [[ "${last_version}" != v* ]] && last_version="v${last_version}"
-        url="https://github.com/admin8800/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz"
+        url="https://github.com/HeadStone1/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz"
         echo -e "开始安装 s-ui ${last_version}"
         wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
@@ -157,6 +177,8 @@ install_s-ui() {
             exit 1
         fi
     fi
+
+    verify_archive "${last_version}"
 
     if [[ -e /usr/local/s-ui/ ]]; then
         systemctl stop s-ui

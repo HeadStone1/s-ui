@@ -1,9 +1,10 @@
 package api
 
 import (
+	"net/http"
 	"strings"
 
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,7 +25,25 @@ func (a *APIHandler) initRouter(g *gin.RouterGroup) {
 	g.Use(func(c *gin.Context) {
 		path := c.Request.URL.Path
 		if !strings.HasSuffix(path, "login") && !strings.HasSuffix(path, "logout") {
-			checkLogin(c)
+			if !IsLogin(c) {
+				if c.GetHeader("X-Requested-With") == "XMLHttpRequest" {
+					pureJsonMsg(c, false, "Invalid login")
+				} else {
+					c.Redirect(http.StatusTemporaryRedirect, "/login")
+				}
+				c.Abort()
+				return
+			}
+			if c.Request.Method == http.MethodPost && !CheckCSRFToken(c) {
+				jsonMsg(c, "failed", common.NewError("invalid CSRF token"))
+				c.Abort()
+				return
+			}
+			if err := SetCSRFHeader(c); err != nil {
+				jsonMsg(c, "failed", err)
+				c.Abort()
+				return
+			}
 		}
 	})
 	g.POST("/:postAction", a.postHandler)
@@ -52,6 +71,8 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.SubConvert(c)
 	case "importdb":
 		a.ApiService.ImportDb(c)
+	case "getdb":
+		a.ApiService.GetDb(c)
 	case "addToken":
 		a.ApiService.AddToken(c)
 		a.apiv2.ReloadTokens()
@@ -94,7 +115,7 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 	case "keypairs":
 		a.ApiService.GetKeypairs(c)
 	case "getdb":
-		a.ApiService.GetDb(c)
+		jsonMsg(c, "failed", common.NewError("database export requires POST confirmation"))
 	case "tokens":
 		a.ApiService.GetTokens(c)
 	case "singbox-config":

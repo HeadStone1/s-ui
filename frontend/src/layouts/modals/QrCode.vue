@@ -122,10 +122,13 @@ export default {
   },
   computed: {
     clientSub() {
-      return Data().subURI + this.client.name
+      if (this.client.id && this.client.subSecret) {
+        return Data().subURI + this.client.id + '/' + this.client.subSecret
+      }
+      return ''
     },
     singbox() {
-      const url = Data().subURI + this.client.name + "?format=json"
+      const url = this.clientSub + "?format=json"
       return "sing-box://import-remote-profile?url=" +  encodeURIComponent(url) + "#" + this.client.name
     },
     clientLinks() {

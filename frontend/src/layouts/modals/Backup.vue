@@ -21,6 +21,11 @@
           </v-col>
         </v-row>
         <v-row>
+          <v-col>
+            <v-text-field v-model="confirmPass" :label="$t('admin.oldPass')" type="password" hide-details></v-text-field>
+          </v-col>
+        </v-row>
+        <v-row>
           <v-col cols="auto" align-self="center">
             <v-btn color="primary" @click="backup()" hide-details>{{ $t('main.backup.backup') }}</v-btn>
           </v-col>
@@ -42,17 +47,34 @@
 
 <script lang="ts">
 import HttpUtils from '@/plugins/httputil'
+import api from '@/plugins/api'
 export default {
   props: ['control', 'visible'],
   data() {
     return {
       exclude: ["stats", "changes"],
+      confirmPass: "",
     }
   },
   methods: {
-    backup() {
-      const excludeOption = this.exclude.length>0 ? '?exclude=' +this.exclude.join(',') : ''
-      window.location.href = 'api/getdb' + excludeOption
+    async backup() {
+      if (!this.confirmPass) return
+      const response = await api.post('api/getdb', {
+        exclude: this.exclude.join(','),
+        confirmPass: this.confirmPass,
+      }, { responseType: 'blob' })
+      const blob = new Blob([response.data], { type: 'application/octet-stream' })
+      const disposition = response.headers['content-disposition'] ?? ''
+      const match = disposition.match(/filename=([^;]+)/)
+      const filename = match ? match[1].replaceAll('"', '') : 's-ui.db'
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     },
     config() {
       window.location.href = 'api/singbox-config'
@@ -75,6 +97,7 @@ export default {
           const uploadMsg = await HttpUtils.post('api/importdb', formData, {
               headers: {
                   'Content-Type': 'multipart/form-data',
+                  'X-Confirm-Password': this.confirmPass,
               },
           })
 
@@ -92,6 +115,7 @@ export default {
     visible(v) {
       if (v) {
         this.exclude = ["stats", "changes"]
+        this.confirmPass = ""
       }
     },
   },

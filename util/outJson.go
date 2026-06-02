@@ -3,9 +3,9 @@ package util
 import (
 	"encoding/json"
 
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/util/common"
 
-	"github.com/admin8800/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/database/model"
 )
 
 // Fill Inbound's out_json

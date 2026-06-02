@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/admin8800/s-ui/config"
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/service"
+	"github.com/HeadStone1/s-ui/config"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/util/common"
 )
 
 func resetAdmin() {
@@ -16,11 +17,15 @@ func resetAdmin() {
 	}
 
 	userService := service.UserService{}
-	err = userService.UpdateFirstUser("admin", "admin")
+	password := common.Random(24)
+	err = userService.UpdateFirstUser("admin", password)
 	if err != nil {
 		fmt.Println("reset admin credentials failed:", err)
 	} else {
 		fmt.Println("reset admin credentials success")
+		fmt.Println("Username:\tadmin")
+		fmt.Println("Password:\t", password)
+		fmt.Println("Save this password now. It will not be shown again.")
 	}
 }
 
@@ -54,11 +59,10 @@ func showAdmin() {
 		fmt.Println("get current user info failed,error info:", err)
 	}
 	username := userModel.Username
-	userpasswd := userModel.Password
-	if (username == "") || (userpasswd == "") {
-		fmt.Println("current username or password is empty")
+	if username == "" {
+		fmt.Println("current username is empty")
 	}
-	fmt.Println("First admin credentials:")
+	fmt.Println("First admin account:")
 	fmt.Println("\tUsername:\t", username)
-	fmt.Println("\tPassword:\t", userpasswd)
+	fmt.Println("\tPassword:\t", "(hidden)")
 }

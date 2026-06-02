@@ -51,7 +51,7 @@ Push-Location frontend
 
 try {
     Write-Host "Installing dependencies..." -ForegroundColor Cyan
-    npm install
+    npm ci
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to install frontend dependencies"
     }

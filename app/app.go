@@ -3,14 +3,14 @@ package app
 import (
 	"log"
 
-	"github.com/admin8800/s-ui/config"
-	"github.com/admin8800/s-ui/core"
-	"github.com/admin8800/s-ui/cronjob"
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/service"
-	"github.com/admin8800/s-ui/sub"
-	"github.com/admin8800/s-ui/web"
+	"github.com/HeadStone1/s-ui/config"
+	"github.com/HeadStone1/s-ui/core"
+	"github.com/HeadStone1/s-ui/cronjob"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/sub"
+	"github.com/HeadStone1/s-ui/web"
 
 	"github.com/op/go-logging"
 )

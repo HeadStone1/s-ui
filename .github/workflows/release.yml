@@ -38,7 +38,7 @@ jobs:
       - name: 构建前端
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run build
 
       - name: 上传前端构建产物
@@ -188,6 +188,11 @@ jobs:
           pattern: s-ui-linux-*
           path: release-assets
           merge-multiple: true
+
+      - name: 生成 SHA256 校验文件
+        run: |
+          cd release-assets
+          sha256sum s-ui-linux-*.tar.gz > sha256sums.txt
 
       - name: 发布到当前仓库 Release
         uses: softprops/action-gh-release@v3

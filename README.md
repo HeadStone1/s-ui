@@ -33,17 +33,18 @@ Backup of [alireza0/s-ui](https://github.com/alireza0/s-ui) v1.4.1
 - 面板路径：/app/
 - 订阅端口：2096
 - 订阅路径：/sub/
-- 用户名/密码：admin
+- 首次启动会生成随机管理员密码，安装后请立即保存输出的密码。
 
 ## 安装或升级到最新版本
 
 ### Linux/macOS
 ```sh
-bash <(curl -Ls https://raw.githubusercontent.com/admin8800/s-ui/main/install.sh)
+curl -fL -o install.sh https://raw.githubusercontent.com/HeadStone1/s-ui/main/install.sh
+bash install.sh
 ```
 
 ### Windows
-1. 从 [GitHub Releases](https://github.com/admin8800/s-ui/releases/latest) 下载最新 Windows 版本。
+1. 从 [GitHub Releases](https://github.com/HeadStone1/s-ui/releases/latest) 下载最新 Windows 版本。
 2. 解压 ZIP 文件。
 3. 以管理员身份运行 `install-windows.bat`。
 4. 按照安装向导操作。
@@ -56,8 +57,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/admin8800/s-ui/main/install.sh
 ## 手动安装
 
 ### Linux/macOS
-1. 根据你的系统和架构，从 GitHub 获取最新版本 S-UI：[https://github.com/admin8800/s-ui/releases/latest](https://github.com/admin8800/s-ui/releases/latest)
-2. **可选：** 获取最新版 `s-ui.sh`：[https://raw.githubusercontent.com/admin8800/s-ui/main/s-ui.sh](https://raw.githubusercontent.com/admin8800/s-ui/main/s-ui.sh)
+1. 根据你的系统和架构，从 GitHub 获取最新版本 S-UI：[https://github.com/HeadStone1/s-ui/releases/latest](https://github.com/HeadStone1/s-ui/releases/latest)
+2. **可选：** 获取最新版 `s-ui.sh`：[https://raw.githubusercontent.com/HeadStone1/s-ui/main/s-ui.sh](https://raw.githubusercontent.com/HeadStone1/s-ui/main/s-ui.sh)
 3. **可选：** 将 `s-ui.sh` 复制到 `/usr/bin/`，并执行 `chmod +x /usr/bin/s-ui`。
 4. 将 s-ui tar.gz 文件解压到你选择的目录，并进入解压后的目录。
 5. 将 `*.service` 文件复制到 `/etc/systemd/system/`，然后执行 `systemctl daemon-reload`。
@@ -65,7 +66,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/admin8800/s-ui/main/install.sh
 7. 使用 `systemctl enable sing-box --now` 启动 sing-box 服务。
 
 ### Windows
-1. 从 GitHub 获取最新 Windows 版本：[https://github.com/admin8800/s-ui/releases/latest](https://github.com/admin8800/s-ui/releases/latest)
+1. 从 GitHub 获取最新 Windows 版本：[https://github.com/HeadStone1/s-ui/releases/latest](https://github.com/HeadStone1/s-ui/releases/latest)
 2. 下载适合的 Windows 包，例如 `s-ui-windows-amd64.zip`。
 3. 将 ZIP 文件解压到你选择的目录。
 4. 以管理员身份运行 `install-windows.bat`。
@@ -106,13 +107,18 @@ curl -fsSL https://get.docker.com | sh
 ```shell
 services:
   s-ui:
-    image: ghcr.io/admin8800/s-ui
+    image: ghcr.io/headstone1/s-ui
     container_name: s-ui
     hostname: "s-ui"
-    network_mode: host
+    ports:
+      - "2095:2095"
+      - "2096:2096"
     volumes:
       - "./db:/app/db"
       - "./cert:/app/cert"
+    read_only: true
+    tmpfs:
+      - /tmp
     tty: true
     restart: unless-stopped
     entrypoint: "./entrypoint.sh"
@@ -123,18 +129,19 @@ services:
 
 ```shell
 docker run -itd \
-    --network host \
+    -p 2095:2095 \
+    -p 2096:2096 \
     -v $PWD/db/:/app/db/ \
     -v $PWD/cert/:/root/cert/ \
     --name s-ui \
     --restart=unless-stopped \
-    ghcr.io/admin8800/s-ui
+    ghcr.io/headstone1/s-ui
 ```
 
 > 自行构建镜像
 
 ```shell
-git clone https://github.com/admin8800/s-ui
+git clone https://github.com/HeadStone1/s-ui
 docker build -t s-ui .
 ```
 
@@ -153,7 +160,7 @@ docker build -t s-ui .
 ### 克隆仓库
 ```shell
 # 克隆仓库
-git clone https://github.com/admin8800/s-ui
+git clone https://github.com/HeadStone1/s-ui
 ```
 
 ### - 前端

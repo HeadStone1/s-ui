@@ -12,7 +12,7 @@
 yarn
 
 # npm
-npm install
+npm ci
 
 # pnpm
 pnpm install

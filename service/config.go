@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/admin8800/s-ui/core"
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/core"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/util/common"
 )
 
 var (
@@ -265,9 +265,13 @@ func (s *ConfigService) CheckChanges(lu string) (bool, error) {
 		return true, nil
 	}
 	if LastUpdate == 0 {
+		intLu, err := strconv.ParseInt(lu, 10, 64)
+		if err != nil {
+			return true, err
+		}
 		db := database.GetDB()
 		var count int64
-		err := db.Model(model.Changes{}).Where("date_time > " + lu).Count(&count).Error
+		err = db.Model(model.Changes{}).Where("date_time > ?", intLu).Count(&count).Error
 		if err == nil {
 			LastUpdate = time.Now().Unix()
 		}
@@ -280,16 +284,21 @@ func (s *ConfigService) CheckChanges(lu string) (bool, error) {
 
 func (s *ConfigService) GetChanges(actor string, chngKey string, count string) []model.Changes {
 	c, _ := strconv.Atoi(count)
-	whereString := "`id`>0"
+	if c <= 0 {
+		c = 100
+	}
+	if c > 500 {
+		c = 500
+	}
+	q := database.GetDB().Model(model.Changes{}).Where("id > ?", 0)
 	if len(actor) > 0 {
-		whereString += " and `actor`='" + actor + "'"
+		q = q.Where("actor = ?", actor)
 	}
 	if len(chngKey) > 0 {
-		whereString += " and `key`='" + chngKey + "'"
+		q = q.Where("key = ?", chngKey)
 	}
-	db := database.GetDB()
 	var chngs []model.Changes
-	err := db.Model(model.Changes{}).Where(whereString).Order("`id` desc").Limit(c).Scan(&chngs).Error
+	err := q.Order("id desc").Limit(c).Scan(&chngs).Error
 	if err != nil {
 		logger.Warning(err)
 	}

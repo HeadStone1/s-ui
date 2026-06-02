@@ -16,25 +16,27 @@ type Tls struct {
 }
 
 type User struct {
-	Id         uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
-	Username   string `json:"username" form:"username"`
-	Password   string `json:"password" form:"password"`
-	LastLogins string `json:"lastLogin"`
+	Id           uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	Username     string `json:"username" form:"username"`
+	Password     string `json:"-" form:"-" gorm:"column:password"`
+	PasswordHash string `json:"-" form:"-" gorm:"column:password_hash"`
+	LastLogins   string `json:"lastLogin"`
 }
 
 type Client struct {
-	Id       uint            `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
-	Enable   bool            `json:"enable" form:"enable"`
-	Name     string          `json:"name" form:"name"`
-	Config   json.RawMessage `json:"config,omitempty" form:"config"`
-	Inbounds json.RawMessage `json:"inbounds" form:"inbounds"`
-	Links    json.RawMessage `json:"links,omitempty" form:"links"`
-	Volume   int64           `json:"volume" form:"volume"`
-	Expiry   int64           `json:"expiry" form:"expiry"`
-	Down     int64           `json:"down" form:"down"`
-	Up       int64           `json:"up" form:"up"`
-	Desc     string          `json:"desc" form:"desc"`
-	Group    string          `json:"group" form:"group"`
+	Id        uint            `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	Enable    bool            `json:"enable" form:"enable"`
+	Name      string          `json:"name" form:"name"`
+	SubSecret string          `json:"subSecret" form:"subSecret" gorm:"column:sub_secret"`
+	Config    json.RawMessage `json:"config,omitempty" form:"config"`
+	Inbounds  json.RawMessage `json:"inbounds" form:"inbounds"`
+	Links     json.RawMessage `json:"links,omitempty" form:"links"`
+	Volume    int64           `json:"volume" form:"volume"`
+	Expiry    int64           `json:"expiry" form:"expiry"`
+	Down      int64           `json:"down" form:"down"`
+	Up        int64           `json:"up" form:"up"`
+	Desc      string          `json:"desc" form:"desc"`
+	Group     string          `json:"group" form:"group"`
 
 	// Delay start and periodic reset
 	DelayStart bool  `json:"delayStart" form:"delayStart" gorm:"default:false;not null"`
@@ -64,10 +66,12 @@ type Changes struct {
 }
 
 type Tokens struct {
-	Id     uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
-	Desc   string `json:"desc" form:"desc"`
-	Token  string `json:"token" form:"token"`
-	Expiry int64  `json:"expiry" form:"expiry"`
-	UserId uint   `json:"userId" form:"userId"`
-	User   *User  `json:"user" gorm:"foreignKey:UserId;references:Id"`
+	Id        uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	Desc      string `json:"desc" form:"desc"`
+	Token     string `json:"token,omitempty" form:"-" gorm:"column:token"`
+	TokenHash string `json:"-" form:"-" gorm:"column:token_hash"`
+	Scope     string `json:"scope" form:"scope" gorm:"column:scope;default:read"`
+	Expiry    int64  `json:"expiry" form:"expiry"`
+	UserId    uint   `json:"userId" form:"userId"`
+	User      *User  `json:"user" gorm:"foreignKey:UserId;references:Id"`
 }

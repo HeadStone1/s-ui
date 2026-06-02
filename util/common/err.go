@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/admin8800/s-ui/logger"
+	"github.com/HeadStone1/s-ui/logger"
 )
 
 func NewErrorf(format string, a ...interface{}) error {

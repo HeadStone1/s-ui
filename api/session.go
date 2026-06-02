@@ -2,15 +2,18 @@ package api
 
 import (
 	"encoding/gob"
+	"net/http"
 
-	"github.com/admin8800/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	loginUser = "LOGIN_USER"
+	loginUser     = "LOGIN_USER"
+	csrfTokenName = "CSRF_TOKEN"
 )
 
 func init() {
@@ -19,8 +22,10 @@ func init() {
 
 func SetLoginUser(c *gin.Context, userName string, maxAge int) error {
 	options := sessions.Options{
-		Path:   "/",
-		Secure: false,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   isSecureRequest(c),
+		SameSite: http.SameSiteLaxMode,
 	}
 	if maxAge > 0 {
 		options.MaxAge = maxAge * 60
@@ -36,7 +41,10 @@ func SetLoginUser(c *gin.Context, userName string, maxAge int) error {
 func SetMaxAge(c *gin.Context) error {
 	s := sessions.Default(c)
 	s.Options(sessions.Options{
-		Path: "/",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   isSecureRequest(c),
+		SameSite: http.SameSiteLaxMode,
 	})
 	return s.Save()
 }
@@ -58,12 +66,50 @@ func IsLogin(c *gin.Context) bool {
 	return GetLoginUser(c) != ""
 }
 
+func EnsureCSRFToken(c *gin.Context) (string, error) {
+	s := sessions.Default(c)
+	obj := s.Get(csrfTokenName)
+	token, ok := obj.(string)
+	if ok && token != "" {
+		return token, nil
+	}
+	token = common.Random(32)
+	s.Set(csrfTokenName, token)
+	return token, s.Save()
+}
+
+func SetCSRFHeader(c *gin.Context) error {
+	token, err := EnsureCSRFToken(c)
+	if err != nil {
+		return err
+	}
+	c.Header("X-CSRF-Token", token)
+	return nil
+}
+
+func CheckCSRFToken(c *gin.Context) bool {
+	s := sessions.Default(c)
+	expected, ok := s.Get(csrfTokenName).(string)
+	if !ok || expected == "" {
+		return false
+	}
+	actual := c.GetHeader("X-CSRF-Token")
+	return actual == expected
+}
+
 func ClearSession(c *gin.Context) {
 	s := sessions.Default(c)
 	s.Clear()
 	s.Options(sessions.Options{
-		Path:   "/",
-		MaxAge: -1,
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   isSecureRequest(c),
+		SameSite: http.SameSiteLaxMode,
 	})
 	s.Save()
+}
+
+func isSecureRequest(c *gin.Context) bool {
+	return c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 }

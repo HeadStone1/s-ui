@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/admin8800/s-ui/database"
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/service"
-	"github.com/admin8800/s-ui/util"
+	"github.com/HeadStone1/s-ui/database"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/service"
+	"github.com/HeadStone1/s-ui/util"
 )
 
 const defaultJson = `
@@ -49,9 +49,18 @@ type JsonService struct {
 }
 
 func (j *JsonService) GetJson(subId string, format string) (*string, []string, error) {
+	subService := SubService{}
+	client, err := subService.getClientBySubId(subId)
+	if err != nil {
+		return nil, nil, err
+	}
+	return j.GetJsonForClient(client, format)
+}
+
+func (j *JsonService) GetJsonForClient(client *model.Client, format string) (*string, []string, error) {
 	var jsonConfig map[string]interface{}
 
-	client, inDatas, err := j.getData(subId)
+	inDatas, err := j.getData(client)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,24 +104,19 @@ func (j *JsonService) GetJson(subId string, format string) (*string, []string, e
 	return &resultStr, headers, nil
 }
 
-func (j *JsonService) getData(subId string) (*model.Client, []*model.Inbound, error) {
+func (j *JsonService) getData(client *model.Client) ([]*model.Inbound, error) {
 	db := database.GetDB()
-	client := &model.Client{}
-	err := db.Model(model.Client{}).Where("enable = true and name = ?", subId).First(client).Error
-	if err != nil {
-		return nil, nil, err
-	}
 	var clientInbounds []uint
-	err = json.Unmarshal(client.Inbounds, &clientInbounds)
+	err := json.Unmarshal(client.Inbounds, &clientInbounds)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var inbounds []*model.Inbound
 	err = db.Model(model.Inbound{}).Preload("Tls").Where("id in ?", clientInbounds).Find(&inbounds).Error
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return client, inbounds, nil
+	return inbounds, nil
 }
 
 func (j *JsonService) getOutbounds(clientConfig json.RawMessage, inbounds []*model.Inbound) (*[]map[string]interface{}, *[]string, error) {

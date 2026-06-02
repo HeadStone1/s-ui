@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/admin8800/s-ui/database/model"
-	"github.com/admin8800/s-ui/logger"
-	"github.com/admin8800/s-ui/util/common"
+	"github.com/HeadStone1/s-ui/database/model"
+	"github.com/HeadStone1/s-ui/logger"
+	"github.com/HeadStone1/s-ui/util/common"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

@@ -31,6 +31,7 @@
             <tr>
               <th>#</th>
               <th>{{ $t('admin.api.token') }}</th>
+              <th>Scope</th>
               <th>{{ $t('client.desc') }}</th>
               <th>{{ $t('date.expiry') }}</th>
               <th>{{ $t('actions.del') }}</th>
@@ -40,6 +41,7 @@
             <tr v-for="(token, index) of tokens" :key="token.id">
               <td>{{ token.id }}</td>
               <td>{{ token.token }}</td>
+              <td>{{ token.scope }}</td>
               <td>{{ token.desc }}</td>
               <td>{{ dateFormatted(token.expiry) }}</td>
               <td>
@@ -91,7 +93,12 @@
               </v-row>
               <v-row>
                 <v-col>
-                  <v-text-field :label="$t('date.expiry')" v-model.number="newToken.expiry" min="0" type="number" :suffix="$t('date.d')"></v-text-field>
+                  <v-select label="Scope" v-model="newToken.scope" :items="tokenScopes"></v-select>
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-text-field :label="$t('date.expiry')" v-model.number="newToken.expiry" min="1" type="number" :suffix="$t('date.d')"></v-text-field>
                 </v-col>
               </v-row>
             </v-card-text>
@@ -146,7 +153,9 @@ export default {
         desc: '',
         token: '',
         expiry: 0,
+        scope: 'read',
       },
+      tokenScopes: ['read', 'write', 'admin'],
       delOverlay: new Array<boolean>(0),
     }
   },
@@ -178,6 +187,7 @@ export default {
           desc: '',
           token: '',
           expiry: 30,
+          scope: 'read',
         }
     },
     showAddToken() {
@@ -186,8 +196,8 @@ export default {
     },
     async addToken() {
       this.loading = true
-      this.newToken.expiry = this.newToken.expiry>0 ? this.newToken.expiry : 0
-      const response = await HttpUtils.post('api/addToken', { desc: this.newToken.desc, expiry: this.newToken.expiry })
+      this.newToken.expiry = this.newToken.expiry>0 ? this.newToken.expiry : 30
+      const response = await HttpUtils.post('api/addToken', { desc: this.newToken.desc, expiry: this.newToken.expiry, scope: this.newToken.scope })
       if (response.success) {
         this.newToken.token = response.obj
         this.loadData()
