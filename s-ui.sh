@@ -163,9 +163,7 @@ set_admin() {
 }
 
 view_admin() {
-    echo "Stored admin passwords are hashed and cannot be recovered."
-    echo "A new administrator password will be generated and shown below."
-    /usr/local/s-ui/sui admin -reset
+    /usr/local/s-ui/sui admin -show
     before_show_menu
 }
 
