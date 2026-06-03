@@ -87,11 +87,13 @@ const login = async () => {
   loading.value=true
   const response = await HttpUtil.post('api/login',{user: username.value, pass: password.value})
   if(response.success){
+    sessionStorage.setItem('s-ui-authenticated', '1')
     setTimeout(() => {
       loading.value=false
       router.push('/')
     }, 500)
   } else {
+    sessionStorage.removeItem('s-ui-authenticated')
     loading.value=false
   }
 }
