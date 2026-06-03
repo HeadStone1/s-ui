@@ -88,9 +88,9 @@ let intervalId:any
 
 // Navigation guard to check authentication state
 router.beforeEach((to) => {
-  // Check the session cookie
-  const sessionCookie = document.cookie.split(';').find(cookie => cookie.trim().startsWith('s-ui='))
-  const isAuthenticated = !!sessionCookie
+  // The session cookie is HttpOnly for security and cannot be read by JS.
+  // Use a local navigation hint only; the backend session remains authoritative.
+  const isAuthenticated = sessionStorage.getItem('s-ui-authenticated') === '1'
 
   // If the route requires authentication and the user is not authenticated, redirect to /login
   if (to.meta.requiresAuth && !isAuthenticated) {
