@@ -21,14 +21,11 @@ func NewSubHandler(g *gin.RouterGroup) {
 }
 
 func (s *SubHandler) initRouter(g *gin.RouterGroup) {
+	// Keep only the hardened two-segment subscription route.
+	// Gin does not allow multiple wildcard names at the same path level,
+	// so the old name-only route must not be registered alongside this one.
 	g.GET("/:clientId/:secret", s.subsWithSecret)
 	g.HEAD("/:clientId/:secret", s.subHeadersWithSecret)
-	g.GET("/:subid", s.subs)
-	g.HEAD("/:subid", s.subHeaders)
-}
-
-func (s *SubHandler) subs(c *gin.Context) {
-	c.String(404, "subscription secret required")
 }
 
 func (s *SubHandler) subsWithSecret(c *gin.Context) {
@@ -68,10 +65,6 @@ func (s *SubHandler) writeSubResponse(c *gin.Context, client *model.Client) {
 	}
 	s.addHeaders(c, headers)
 	c.String(200, *result)
-}
-
-func (s *SubHandler) subHeaders(c *gin.Context) {
-	c.String(404, "subscription secret required")
 }
 
 func (s *SubHandler) subHeadersWithSecret(c *gin.Context) {
