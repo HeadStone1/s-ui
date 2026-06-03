@@ -24,7 +24,9 @@ func SetLoginUser(c *gin.Context, userName string, maxAge int) error {
 	options := sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecureRequest(c),
+		// Keep Secure disabled by default for direct HTTP/IP deployments.
+		// Deployments behind HTTPS reverse proxies can enforce HTTPS at the proxy layer.
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 	}
 	if maxAge > 0 {
@@ -43,7 +45,7 @@ func SetMaxAge(c *gin.Context) error {
 	s.Options(sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecureRequest(c),
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 	})
 	return s.Save()
@@ -104,12 +106,8 @@ func ClearSession(c *gin.Context) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   isSecureRequest(c),
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 	})
 	s.Save()
-}
-
-func isSecureRequest(c *gin.Context) bool {
-	return c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 }
