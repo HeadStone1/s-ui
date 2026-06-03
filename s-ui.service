@@ -6,6 +6,7 @@ Wants=network.target
 [Service]
 Type=simple
 WorkingDirectory=/usr/local/s-ui/
+Environment=LD_LIBRARY_PATH=/usr/local/s-ui
 ExecStart=/usr/local/s-ui/sui
 Restart=on-failure
 RestartSec=10s
