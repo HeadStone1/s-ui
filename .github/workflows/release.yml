@@ -39,7 +39,7 @@ jobs:
       - name: Build frontend
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
 
       - name: Copy frontend assets
@@ -54,7 +54,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Prepare cronet library for naive outbound
+        run: |
+          set -e
+          CRONET_URL="https://github.com/SagerNet/cronet-go/releases/latest/download/libcronet-linux-amd64.so"
+          echo "Downloading ${CRONET_URL}"
+          curl -fL -o ./libcronet.so "${CRONET_URL}"
+          chmod 755 ./libcronet.so
+
       - name: Build backend
+        env:
+          CGO_ENABLED: "1"
+          CGO_CFLAGS: "-D_LARGEFILE64_SOURCE"
         run: |
           go build -ldflags="-w -s" \
             -tags "${SUI_BUILD_TAGS}" \
@@ -64,6 +75,7 @@ jobs:
         run: |
           mkdir -p s-ui
           cp sui s-ui/
+          cp libcronet.so s-ui/
           cp s-ui.service s-ui/
           cp s-ui.sh s-ui/
           tar -zcvf s-ui-linux-amd64.tar.gz s-ui
