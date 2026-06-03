@@ -1,4 +1,4 @@
-import api from './api'
+import api, { clearCsrfToken } from './api'
 import { i18n } from '@/locales'
 import router from '@/router'
 import { push } from 'notivue'
@@ -11,6 +11,7 @@ export interface Msg {
 
 function clearLocalAuthHint(): void {
   sessionStorage.removeItem('s-ui-authenticated')
+  clearCsrfToken()
 }
 
 function _handleMsg(msg: any): void {

@@ -7,7 +7,7 @@
             <v-card-text>
               <v-form @submit.prevent="login" ref="form">
                 <v-text-field v-model="username" :label="$t('login.username')" :rules="usernameRules" required></v-text-field>
-                <v-text-field v-model="password" :label="$t('login.password')" :rules="passwordRules" type="text" required></v-text-field>
+                <v-text-field v-model="password" :label="$t('login.password')" :rules="passwordRules" type="password" required></v-text-field>
                 <v-btn :loading="loading" type="submit" color="primary" block class="mt-2" v-text="$t('actions.submit')"></v-btn>
               </v-form>
               <v-select

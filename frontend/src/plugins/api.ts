@@ -8,7 +8,7 @@ api.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded; 
 api.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
 
 const pendingRequests = new Map()
-let csrfToken = ''
+let csrfToken = sessionStorage.getItem('csrfToken') || ''
 
 api.interceptors.request.use(
     (config) => {
@@ -44,6 +44,7 @@ api.interceptors.response.use(
         const nextCsrfToken = response.headers['x-csrf-token']
         if (nextCsrfToken) {
             csrfToken = nextCsrfToken
+            sessionStorage.setItem('csrfToken', csrfToken)
         }
         // Remove the request from the pending requests map
         const requestKey = `${response.config.method}:${response.config.url}`
@@ -64,3 +65,8 @@ api.interceptors.response.use(
 )
 
 export default api
+
+export const clearCsrfToken = () => {
+    csrfToken = ''
+    sessionStorage.removeItem('csrfToken')
+}
