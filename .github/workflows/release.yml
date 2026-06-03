@@ -17,6 +17,7 @@ permissions:
 
 env:
   NODE_VERSION: "25"
+  SUI_BUILD_TAGS: "with_quic,with_grpc,with_utls,with_acme,with_gvisor,with_naive_outbound,with_purego,with_tailscale"
 
 jobs:
   build-linux-amd64:
@@ -38,7 +39,7 @@ jobs:
       - name: Build frontend
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run build
 
       - name: Copy frontend assets
@@ -55,7 +56,9 @@ jobs:
 
       - name: Build backend
         run: |
-          go build -ldflags="-w -s" -o sui main.go
+          go build -ldflags="-w -s" \
+            -tags "${SUI_BUILD_TAGS}" \
+            -o sui main.go
 
       - name: Package release archive
         run: |
