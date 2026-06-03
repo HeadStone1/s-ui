@@ -9,12 +9,17 @@ export interface Msg {
   obj: any | null
 }
 
+function clearLocalAuthHint(): void {
+  sessionStorage.removeItem('s-ui-authenticated')
+}
+
 function _handleMsg(msg: any): void {
   if (!isMsg(msg)) {
     return
   }
   if(msg.msg){
     if (!msg.success && msg.msg == "Invalid login") {
+      clearLocalAuthHint()
       push.error({
         title: i18n.global.t('invalidLogin'),
       })
@@ -35,8 +40,11 @@ function _handleMsg(msg: any): void {
 }
 
 export const logout = async () => {
+  clearLocalAuthHint()
   const response = await HttpUtils.get('api/logout')
   if(response.success){
+    router.push('/login')
+  } else {
     router.push('/login')
   }
 }
