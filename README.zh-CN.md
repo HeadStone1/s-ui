@@ -86,6 +86,18 @@
 - 订阅 URL 使用客户端 ID 和随机 secret。
 - 旧的仅客户端名称订阅路径不再返回订阅内容。
 
+### Xray、v2rayN 与 Mihomo 兼容适配
+
+- 同时支持传统 base64 JSON VMess 分享链接和现代 AEAD 风格 VMess URI。
+- 保留 VLESS/VMess 现代参数，包括 packet encoding、encryption、IPv6 地址、uTLS、REALITY、ECH、证书固定 `pcs` 与证书名称校验 `vcn`。
+- 生成 Mihomo 配置时支持 VLESS XHTTP、XHTTP `extra` 参数以及 XMUX/reuse settings。
+- 为 Clash Verge Rev 等 Mihomo 客户端生成兼容配置，覆盖 WS、HTTPUpgrade、gRPC、HTTP/H2 与 XHTTP 传输。
+- 生成 sing-box JSON 时过滤 Xray/Mihomo 专用的 XHTTP 与 TLS 元数据，避免产生核心无法识别的字段。
+- 当配置外部控制器时，从订阅 secret 派生独立的 Mihomo 控制器密码，不直接暴露面板或订阅凭据。
+- Clash 默认配置改为更安全的按需启用 TUN，同时启用配置持久化并提供 IPv6 DNS 能力。
+
+兼容链路已使用 Mihomo Meta v1.19.29 和 sing-box v1.13.16 实际校验。完整兼容矩阵、测试命令、结果与限制见[兼容性与功能测试报告](./docs/compatibility-test-report.md)。
+
 ### Docker 和安装源
 
 - 默认 Docker Compose 不再使用 host network。
@@ -120,12 +132,13 @@ bash install.sh
 
 ## 验证状态
 
-当前版本已通过基础检查：
+当前版本已通过单元、回归、构建、订阅 HTTP 与真实核心配置检查：
 
 ```sh
 gofmt
 go test ./...
 git diff --check
+npm run build
 ```
 
-Go 后端编译通过，仓库内已无 `admin8800` 残留。
+端到端订阅测试覆盖数据库数据、带鉴权的 HTTP 路由、原始订阅、Clash 配置生成、sing-box JSON 生成，以及真实 Mihomo/sing-box 可执行文件的配置验收。当前不宣称已完成桌面 GUI 点击导入或真实代理流量测试；这两项仍需要交互式桌面环境和可连接的测试节点。
