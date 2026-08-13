@@ -1,10 +1,14 @@
 package util
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/HeadStone1/s-ui/database/model"
@@ -115,8 +119,11 @@ func prepareTls(t *model.Tls) map[string]interface{} {
 		case "enabled", "server_name", "alpn":
 			oTls[k] = v
 		case "reality":
-			reality := v.(map[string]interface{})
-			clientReality := oTls["reality"].(map[string]interface{})
+			reality, _ := v.(map[string]interface{})
+			clientReality, _ := oTls["reality"].(map[string]interface{})
+			if clientReality == nil {
+				clientReality = make(map[string]interface{})
+			}
 			clientReality["enabled"] = reality["enabled"]
 			if shortIDs, hasSIds := reality["short_id"].([]interface{}); hasSIds && len(shortIDs) > 0 {
 				clientReality["short_id"] = shortIDs[common.RandomInt(len(shortIDs))]
@@ -124,13 +131,47 @@ func prepareTls(t *model.Tls) map[string]interface{} {
 			oTls["reality"] = clientReality
 		}
 	}
+	if boolValue(oTls["insecure"]) && stringListValue(oTls["xray_pinned_peer_cert_sha256"]) == "" {
+		if fingerprint := certificateSHA256FromTLSConfig(iTls); fingerprint != "" {
+			oTls["xray_pinned_peer_cert_sha256"] = []string{fingerprint}
+		}
+	}
 	return oTls
+}
+
+func certificateSHA256FromTLSConfig(tlsConfig map[string]interface{}) string {
+	var certificatePEM []byte
+	switch certificate := tlsConfig["certificate"].(type) {
+	case string:
+		certificatePEM = []byte(certificate)
+	case []string:
+		certificatePEM = []byte(strings.Join(certificate, "\n"))
+	case []interface{}:
+		certificatePEM = []byte(strings.Join(stringSliceValue(certificate), "\n"))
+	}
+	if len(certificatePEM) == 0 {
+		if certificatePath, ok := tlsConfig["certificate_path"].(string); ok && certificatePath != "" {
+			certificatePEM, _ = os.ReadFile(certificatePath)
+		}
+	}
+	for len(certificatePEM) > 0 {
+		block, rest := pem.Decode(certificatePEM)
+		if block == nil {
+			return ""
+		}
+		if block.Type == "CERTIFICATE" {
+			digest := sha256.Sum256(block.Bytes)
+			return hex.EncodeToString(digest[:])
+		}
+		certificatePEM = rest
+	}
+	return ""
 }
 
 func socksLink(userConfig map[string]interface{}, addrs []map[string]interface{}) []string {
 	var links []string
 	for _, addr := range addrs {
-		links = append(links, fmt.Sprintf("socks5://%s:%s@%s:%d", userConfig["username"], userConfig["password"], addr["server"].(string), uint(addr["server_port"].(float64))))
+		links = append(links, fmt.Sprintf("socks5://%s:%s@%s:%d", userConfig["username"], userConfig["password"], formatLinkHost(addr["server"].(string)), uint(addr["server_port"].(float64))))
 	}
 	return links
 }
@@ -142,7 +183,7 @@ func httpLink(userConfig map[string]interface{}, addrs []map[string]interface{})
 		if addr["tls"] != nil {
 			protocol = "https"
 		}
-		links = append(links, fmt.Sprintf("%s://%s:%s@%s:%d", protocol, userConfig["username"], userConfig["password"], addr["server"].(string), uint(addr["server_port"].(float64))))
+		links = append(links, fmt.Sprintf("%s://%s:%s@%s:%d", protocol, userConfig["username"], userConfig["password"], formatLinkHost(addr["server"].(string)), uint(addr["server_port"].(float64))))
 	}
 	return links
 }
@@ -171,7 +212,7 @@ func shadowsocksLink(
 	var links []string
 	for _, addr := range addrs {
 		port, _ := addr["server_port"].(float64)
-		links = append(links, fmt.Sprintf("%s@%s:%.0f#%s", uriBase, addr["server"].(string), port, addr["remark"].(string)))
+		links = append(links, fmt.Sprintf("%s@%s:%.0f#%s", uriBase, formatLinkHost(addr["server"].(string)), port, addr["remark"].(string)))
 	}
 	return links
 }
@@ -212,7 +253,7 @@ func naiveLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := baseUri + toBase64([]byte(fmt.Sprintf("%s:%s@%s:%.0f", username, password, addr["server"].(string), port)))
+		uri := baseUri + toBase64([]byte(fmt.Sprintf("%s:%s@%s:%.0f", username, password, formatLinkHost(addr["server"].(string)), port)))
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 	return links
@@ -261,7 +302,7 @@ func hysteriaLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := fmt.Sprintf("%s%s:%.0f", baseUri, formatLinkHost(addr["server"].(string)), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -314,7 +355,7 @@ func hysteria2Link(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := fmt.Sprintf("%s%s:%.0f", baseUri, formatLinkHost(addr["server"].(string)), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -336,7 +377,7 @@ func anytlsLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := fmt.Sprintf("%s%s:%.0f", baseUri, formatLinkHost(addr["server"].(string)), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -363,7 +404,7 @@ func tuicLink(
 		}
 
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("%s%s:%.0f", baseUri, addr["server"].(string), port)
+		uri := fmt.Sprintf("%s%s:%.0f", baseUri, formatLinkHost(addr["server"].(string)), port)
 		links = append(links, addParams(uri, params, addr["remark"].(string)))
 	}
 
@@ -382,14 +423,20 @@ func vlessLink(
 	for _, addr := range addrs {
 		params := make([]LinkParam, len(baseParams))
 		copy(params, baseParams)
-		if tls, ok := addr["tls"].(map[string]interface{}); ok && tls["enabled"].(bool) {
+		if tls, ok := addr["tls"].(map[string]interface{}); ok && boolValue(tls["enabled"]) {
 			getTlsParams(&params, tls, "allowInsecure")
 			if flow, ok := userConfig["flow"].(string); ok {
 				params = append(params, LinkParam{"flow", flow})
 			}
 		}
+		if packetEncoding, ok := userConfig["packet_encoding"].(string); ok && packetEncoding != "" {
+			params = append(params, LinkParam{"packet-encoding", packetEncoding})
+		}
+		if encryption, ok := userConfig["encryption"].(string); ok && encryption != "" {
+			params = append(params, LinkParam{"encryption", encryption})
+		}
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("vless://%s@%s:%.0f", uuid, addr["server"].(string), port)
+		uri := fmt.Sprintf("vless://%s@%s:%.0f", uuid, formatLinkHost(addr["server"].(string)), port)
 		uri = addParams(uri, params, addr["remark"].(string))
 		links = append(links, uri)
 	}
@@ -408,11 +455,11 @@ func trojanLink(
 	for _, addr := range addrs {
 		params := make([]LinkParam, len(baseParams))
 		copy(params, baseParams)
-		if tls, ok := addr["tls"].(map[string]interface{}); ok && tls["enabled"].(bool) {
+		if tls, ok := addr["tls"].(map[string]interface{}); ok && boolValue(tls["enabled"]) {
 			getTlsParams(&params, tls, "allowInsecure")
 		}
 		port, _ := addr["server_port"].(float64)
-		uri := fmt.Sprintf("trojan://%s@%s:%.0f", password, addr["server"].(string), port)
+		uri := fmt.Sprintf("trojan://%s@%s:%.0f", password, formatLinkHost(addr["server"].(string)), port)
 		uri = addParams(uri, params, addr["remark"].(string))
 		links = append(links, uri)
 	}
@@ -475,6 +522,15 @@ func vmessLink(
 		if path != "" {
 			obj["path"] = path
 		}
+		if packetEncoding, ok := userConfig["packet_encoding"].(string); ok && packetEncoding != "" {
+			obj["packet-encoding"] = packetEncoding
+		}
+		if globalPadding, ok := userConfig["global_padding"].(bool); ok {
+			obj["global-padding"] = globalPadding
+		}
+		if authenticatedLength, ok := userConfig["authenticated_length"].(bool); ok {
+			obj["authenticated-length"] = authenticatedLength
+		}
 		populateVmessTlsParams(obj, addr["tls"])
 
 		jsonStr, _ := json.Marshal(obj)
@@ -486,16 +542,23 @@ func vmessLink(
 }
 
 func populateVmessTlsParams(obj map[string]interface{}, tlsConfig interface{}) {
-	if tlsMap, ok := tlsConfig.(map[string]interface{}); ok && tlsMap["enabled"].(bool) {
+	if tlsMap, ok := tlsConfig.(map[string]interface{}); ok && boolValue(tlsMap["enabled"]) {
 		obj["tls"] = "tls"
+		if boolValue(tlsMap["insecure"]) && stringListValue(tlsMap["xray_pinned_peer_cert_sha256"]) == "" {
+			// v2rayN's current Base64-JSON format uses "insecure" rather
+			// than the deprecated Xray allowInsecure field.
+			obj["insecure"] = "1"
+		}
 		var tlsParams []LinkParam
 		getTlsParams(&tlsParams, tlsMap, "allowInsecure")
 		for _, p := range tlsParams {
 			switch p.Key {
 			case "security":
 				// ignore, as "tls" is already set
-			case "allowInsecure":
-				obj["allowInsecure"] = 1
+			case "pcs":
+				obj["pcs"] = p.Value
+			case "vcn":
+				obj["vcn"] = p.Value
 			case "sni":
 				obj["sni"] = p.Value
 			case "fp":
@@ -545,11 +608,7 @@ func getTransportParams(t interface{}) []LinkParam {
 
 	switch transportType {
 	case "http":
-		if host, ok := trasport["host"].([]interface{}); ok {
-			var hosts []string
-			for _, v := range host {
-				hosts = append(hosts, v.(string))
-			}
+		if hosts := stringSliceValue(trasport["host"]); len(hosts) > 0 {
 			params = append(params, LinkParam{"host", strings.Join(hosts, ",")})
 		}
 		if path, ok := trasport["path"].(string); ok {
@@ -575,12 +634,26 @@ func getTransportParams(t interface{}) []LinkParam {
 		if path, ok := trasport["path"].(string); ok {
 			params = append(params, LinkParam{"path", path})
 		}
+	case "xhttp":
+		if host, ok := trasport["host"].(string); ok && host != "" {
+			params = append(params, LinkParam{"host", host})
+		}
+		if path, ok := trasport["path"].(string); ok && path != "" {
+			params = append(params, LinkParam{"path", path})
+		}
+		if mode, ok := trasport["mode"].(string); ok && mode != "" {
+			params = append(params, LinkParam{"mode", mode})
+		}
+		if extra := xhttpExtraJSON(trasport); extra != "" {
+			params = append(params, LinkParam{"extra", extra})
+		}
 	}
 	return params
 }
 
 func getTlsParams(params *[]LinkParam, tls map[string]interface{}, insecureKey string) {
-	if reality, ok := tls["reality"].(map[string]interface{}); ok && reality["enabled"].(bool) {
+	reality, hasReality := tls["reality"].(map[string]interface{})
+	if hasReality && boolValue(reality["enabled"]) {
 		*params = append(*params, LinkParam{"security", "reality"})
 		if pbk, ok := reality["public_key"].(string); ok {
 			*params = append(*params, LinkParam{"pbk", pbk})
@@ -590,8 +663,21 @@ func getTlsParams(params *[]LinkParam, tls map[string]interface{}, insecureKey s
 		}
 	} else {
 		*params = append(*params, LinkParam{"security", "tls"})
-		if insecure, ok := tls["insecure"].(bool); ok && insecure {
-			*params = append(*params, LinkParam{insecureKey, "1"})
+		pcs := stringListValue(tls["xray_pinned_peer_cert_sha256"])
+		if pcs != "" {
+			*params = append(*params, LinkParam{"pcs", pcs})
+		}
+		if vcn := stringValue(tls["xray_verify_peer_cert_by_name"]); vcn != "" {
+			*params = append(*params, LinkParam{"vcn", vcn})
+		}
+		if boolValue(tls["insecure"]) {
+			if insecureKey != "allowInsecure" {
+				*params = append(*params, LinkParam{insecureKey, "1"})
+			} else if pcs == "" {
+				// Older clients still need this fallback for self-signed
+				// deployments when no certificate pin is available.
+				*params = append(*params, LinkParam{"allowInsecure", "1"})
+			}
 		}
 		if disableSni, ok := tls["disable_sni"].(bool); ok && disableSni {
 			*params = append(*params, LinkParam{"disable_sni", "1"})
@@ -605,11 +691,116 @@ func getTlsParams(params *[]LinkParam, tls map[string]interface{}, insecureKey s
 	if sni, ok := tls["server_name"].(string); ok {
 		*params = append(*params, LinkParam{"sni", sni})
 	}
-	if alpn, ok := tls["alpn"].([]interface{}); ok {
-		alpnList := make([]string, len(alpn))
-		for i, v := range alpn {
-			alpnList[i] = v.(string)
-		}
+	if alpnList := stringSliceValue(tls["alpn"]); len(alpnList) > 0 {
 		*params = append(*params, LinkParam{"alpn", strings.Join(alpnList, ",")})
 	}
+}
+
+func stringValue(value interface{}) string {
+	valueString, _ := value.(string)
+	return valueString
+}
+
+func stringListValue(value interface{}) string {
+	switch values := value.(type) {
+	case string:
+		return values
+	case []string:
+		return strings.Join(values, ",")
+	case []interface{}:
+		result := make([]string, 0, len(values))
+		for _, item := range values {
+			if itemString, ok := item.(string); ok {
+				result = append(result, itemString)
+			}
+		}
+		return strings.Join(result, ",")
+	default:
+		return ""
+	}
+}
+
+func stringSliceValue(value interface{}) []string {
+	switch values := value.(type) {
+	case string:
+		if values == "" {
+			return nil
+		}
+		return []string{values}
+	case []string:
+		return values
+	case []interface{}:
+		result := make([]string, 0, len(values))
+		for _, item := range values {
+			if itemString, ok := item.(string); ok {
+				result = append(result, itemString)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func boolValue(value interface{}) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		return typed == "1" || strings.EqualFold(typed, "true")
+	case float64:
+		return typed != 0
+	case int:
+		return typed != 0
+	default:
+		return false
+	}
+}
+
+func formatLinkHost(host string) string {
+	host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if strings.Contains(host, ":") {
+		return "[" + host + "]"
+	}
+	return host
+}
+
+func xhttpExtraJSON(transport map[string]interface{}) string {
+	if extra, ok := transport["extra"].(string); ok && extra != "" {
+		return extra
+	}
+	if extra, ok := transport["extra"].(map[string]interface{}); ok && len(extra) > 0 {
+		if encoded, err := json.Marshal(extra); err == nil {
+			return string(encoded)
+		}
+	}
+
+	extra := make(map[string]interface{})
+	for key, value := range transport {
+		if key == "type" || key == "host" || key == "path" || key == "mode" || key == "extra" {
+			continue
+		}
+		extra[xhttpXrayKey(key)] = value
+	}
+	if len(extra) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(extra)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
+}
+
+func xhttpXrayKey(key string) string {
+	if key == "no_grpc_header" {
+		return "noGRPCHeader"
+	}
+	parts := strings.Split(key, "_")
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return strings.Join(parts, "")
 }

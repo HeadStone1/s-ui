@@ -86,6 +86,18 @@ This project is provided only for LAN-based learning, research, and technical ex
 - Subscription URLs use the client ID and a random secret.
 - Old name-only subscription paths no longer return subscription content.
 
+### Xray, v2rayN, and Mihomo Compatibility
+
+- Supports legacy base64 JSON VMess links and modern AEAD-style VMess URIs.
+- Preserves modern VLESS/VMess options including packet encoding, encryption, IPv6 endpoints, uTLS, REALITY, ECH, certificate pin (`pcs`), and certificate-name verification (`vcn`).
+- Supports VLESS XHTTP links, XHTTP `extra` options, and XMUX/reuse settings when generating Mihomo profiles.
+- Generates Mihomo-compatible profiles for clients such as Clash Verge Rev, including WS, HTTPUpgrade, gRPC, HTTP/H2, and XHTTP transports.
+- Keeps Xray/Mihomo-only XHTTP and TLS metadata out of generated sing-box JSON profiles.
+- Derives a separate Mihomo external-controller secret from the subscription secret instead of exposing panel or subscription credentials directly.
+- Uses safer Clash defaults: TUN is disabled until explicitly enabled, while profile persistence and IPv6-capable DNS are available by default.
+
+The compatibility path was validated with Mihomo Meta v1.19.29 and sing-box v1.13.16. See the [compatibility and functional test report](./docs/compatibility-test-report.md) for the matrix, commands, results, and current limitations.
+
 ### Docker and Install Sources
 
 - The default Docker Compose configuration no longer uses host networking.
@@ -120,12 +132,13 @@ After installation, save the random administrator password printed in the termin
 
 ## Verification Status
 
-The current version has passed the following basic checks:
+The current version has passed unit, regression, build, HTTP subscription, and real-core configuration checks:
 
 ```sh
 gofmt
 go test ./...
 git diff --check
+npm run build
 ```
 
-The Go backend compiles successfully, and no `admin8800` references remain in the repository.
+The end-to-end subscription test covers database data, authenticated HTTP routes, raw subscriptions, Clash generation, sing-box JSON generation, and validation by real Mihomo/sing-box executables. It does not claim GUI click-through import or live proxy traffic testing; those require an interactive desktop environment and reachable test nodes.

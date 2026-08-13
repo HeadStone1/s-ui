@@ -83,6 +83,9 @@ func (j *JsonService) GetJsonForClient(client *model.Client, format string) (*st
 		}
 	}
 
+	// Keep Mihomo/Xray-only compatibility metadata out of the sing-box profile.
+	j.removeUnsupportedOutbounds(outbounds, outTags)
+
 	j.addDefaultOutbounds(outbounds, outTags)
 
 	err = json.Unmarshal([]byte(defaultJson), &jsonConfig)
@@ -102,6 +105,28 @@ func (j *JsonService) GetJsonForClient(client *model.Client, format string) (*st
 	headers := util.GetHeaders(client, updateInterval)
 
 	return &resultStr, headers, nil
+}
+
+func (j *JsonService) removeUnsupportedOutbounds(outbounds *[]map[string]interface{}, outTags *[]string) {
+	filtered := make([]map[string]interface{}, 0, len(*outbounds))
+	filteredTags := make([]string, 0, len(*outTags))
+	for index, outbound := range *outbounds {
+		transport, _ := outbound["transport"].(map[string]interface{})
+		transportType, _ := transport["type"].(string)
+		if transportType == "xhttp" {
+			continue
+		}
+		if tls, ok := outbound["tls"].(map[string]interface{}); ok {
+			delete(tls, "xray_pinned_peer_cert_sha256")
+			delete(tls, "xray_verify_peer_cert_by_name")
+		}
+		filtered = append(filtered, outbound)
+		if index < len(*outTags) {
+			filteredTags = append(filteredTags, (*outTags)[index])
+		}
+	}
+	*outbounds = filtered
+	*outTags = filteredTags
 }
 
 func (j *JsonService) getData(client *model.Client) ([]*model.Inbound, error) {

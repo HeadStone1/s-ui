@@ -16,6 +16,9 @@ func GetOutbound(uri string, i int) (*map[string]interface{}, string, error) {
 	if err == nil {
 		switch u.Scheme {
 		case "vmess":
+			if u.User != nil && u.Hostname() != "" {
+				return vmessURI(u, i)
+			}
 			return vmess(u.Host, i)
 		case "vless":
 			return vless(u, i)
@@ -36,6 +39,47 @@ func GetOutbound(uri string, i int) (*map[string]interface{}, string, error) {
 		}
 	}
 	return nil, "", common.NewError("Unsupported link format")
+}
+
+func vmessURI(u *url.URL, i int) (*map[string]interface{}, string, error) {
+	query := u.Query()
+	host, portStr, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return nil, "", common.NewError("Invalid vmess endpoint")
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, "", common.NewError("Invalid vmess port")
+	}
+	tag := u.Fragment
+	if i > 0 {
+		tag = fmt.Sprintf("%d.%s", i, tag)
+	}
+	encryption := query.Get("encryption")
+	if encryption == "" {
+		encryption = "auto"
+	}
+	outbound := map[string]interface{}{
+		"type":        "vmess",
+		"tag":         tag,
+		"server":      host,
+		"server_port": port,
+		"uuid":        u.User.Username(),
+		"security":    encryption,
+		"alter_id":    0,
+		"tls":         getTls(query.Get("security"), &query),
+		"transport":   getTransport(query.Get("type"), &query),
+	}
+	if packetEncoding := query.Get("packet-encoding"); packetEncoding != "" {
+		outbound["packet_encoding"] = packetEncoding
+	}
+	if value := query.Get("global-padding"); value != "" {
+		outbound["global_padding"] = boolValue(value)
+	}
+	if value := query.Get("authenticated-length"); value != "" {
+		outbound["authenticated_length"] = boolValue(value)
+	}
+	return &outbound, tag, nil
 }
 
 func vmess(data string, i int) (*map[string]interface{}, string, error) {
@@ -95,7 +139,7 @@ func vmess(data string, i int) (*map[string]interface{}, string, error) {
 		tls["enabled"] = true
 		tls_sni, _ := dataJson["sni"].(string)
 		tls_alpn, _ := dataJson["alpn"].(string)
-		_, tls_insecure := dataJson["allowInsecure"]
+		tls_insecure := boolValue(dataJson["allowInsecure"]) || boolValue(dataJson["insecure"])
 		tls_fp, _ := dataJson["fp"].(string)
 		if len(tls_sni) > 0 {
 			tls["server_name"] = tls_sni
@@ -112,25 +156,42 @@ func vmess(data string, i int) (*map[string]interface{}, string, error) {
 				"fingerprint": tls_fp,
 			}
 		}
+		if pcs := stringValue(dataJson["pcs"]); pcs != "" {
+			tls["xray_pinned_peer_cert_sha256"] = splitNonEmpty(pcs)
+		}
+		if vcn := stringValue(dataJson["vcn"]); vcn != "" {
+			tls["xray_verify_peer_cert_by_name"] = vcn
+		}
 	}
 	tag, _ := dataJson["ps"].(string)
 	if i > 0 {
 		tag = fmt.Sprintf("%d.%s", i, tag)
 	}
-	alter_id := 0
-	if aid, ok := dataJson["aid"].(float64); ok {
-		alter_id = int(aid)
+	alterID := numberAsInt(dataJson["aid"])
+	port := numberAsInt(dataJson["port"])
+	security := stringValue(dataJson["scy"])
+	if security == "" {
+		security = "auto"
 	}
 	vmess := map[string]interface{}{
 		"type":        "vmess",
 		"tag":         tag,
 		"server":      dataJson["add"],
-		"server_port": dataJson["port"],
+		"server_port": port,
 		"uuid":        dataJson["id"],
-		"security":    "auto",
-		"alter_id":    alter_id,
+		"security":    security,
+		"alter_id":    alterID,
 		"tls":         tls,
 		"transport":   transport,
+	}
+	if packetEncoding := stringValue(dataJson["packet-encoding"]); packetEncoding != "" {
+		vmess["packet_encoding"] = packetEncoding
+	}
+	if globalPadding, ok := dataJson["global-padding"].(bool); ok {
+		vmess["global_padding"] = globalPadding
+	}
+	if authenticatedLength, ok := dataJson["authenticated-length"].(bool); ok {
+		vmess["authenticated_length"] = authenticatedLength
 	}
 	return &vmess, tag, err
 }
@@ -161,6 +222,12 @@ func vless(u *url.URL, i int) (*map[string]interface{}, string, error) {
 		"flow":        query.Get("flow"),
 		"tls":         getTls(security, &query),
 		"transport":   getTransport(tp_type, &query),
+	}
+	if packetEncoding := query.Get("packet-encoding"); packetEncoding != "" {
+		vless["packet_encoding"] = packetEncoding
+	}
+	if encryption := query.Get("encryption"); encryption != "" {
+		vless["encryption"] = encryption
 	}
 	return &vless, tag, nil
 }
@@ -527,6 +594,21 @@ func getTransport(tp_type string, q *url.Values) map[string]interface{} {
 		transport["type"] = "httpupgrade"
 		transport["path"] = tp_path
 		transport["host"] = tp_host
+	case "xhttp":
+		transport["type"] = "xhttp"
+		transport["path"] = tp_path
+		transport["host"] = tp_host
+		if mode := q.Get("mode"); mode != "" {
+			transport["mode"] = mode
+		}
+		if extra := q.Get("extra"); extra != "" {
+			var extraConfig map[string]interface{}
+			if err := json.Unmarshal([]byte(extra), &extraConfig); err == nil {
+				for key, value := range extraConfig {
+					transport[key] = value
+				}
+			}
+		}
 	}
 	return transport
 }
@@ -537,11 +619,13 @@ func getTls(security string, q *url.Values) map[string]interface{} {
 	tls_sni := q.Get("sni")
 	tls_allow_insecure := q.Get("allowInsecure")
 	tls_insecure := q.Get("insecure")
+	tls_pcs := q.Get("pcs")
+	tls_vcn := q.Get("vcn")
 	tls_alpn := q.Get("alpn")
 	tls_ech := q.Get("ech")
 	disable_sni := q.Get("disable_sni")
 	switch security {
-	case "tls":
+	case "tls", "xtls":
 		tls["enabled"] = true
 	case "reality":
 		tls["enabled"] = true
@@ -559,6 +643,12 @@ func getTls(security string, q *url.Values) map[string]interface{} {
 	}
 	if tls_insecure == "1" || tls_insecure == "true" || tls_allow_insecure == "1" || tls_allow_insecure == "true" {
 		tls["insecure"] = true
+	}
+	if tls_pcs != "" {
+		tls["xray_pinned_peer_cert_sha256"] = splitNonEmpty(tls_pcs)
+	}
+	if tls_vcn != "" {
+		tls["xray_verify_peer_cert_by_name"] = tls_vcn
 	}
 	if len(tls_fp) > 0 {
 		tls["utls"] = map[string]interface{}{
@@ -578,4 +668,29 @@ func getTls(security string, q *url.Values) map[string]interface{} {
 		tls["disable_sni"] = true
 	}
 	return tls
+}
+
+func splitNonEmpty(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
+func numberAsInt(value interface{}) int {
+	switch typed := value.(type) {
+	case float64:
+		return int(typed)
+	case int:
+		return typed
+	case string:
+		result, _ := strconv.Atoi(typed)
+		return result
+	default:
+		return 0
+	}
 }
